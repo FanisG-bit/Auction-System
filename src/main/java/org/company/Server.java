@@ -1,6 +1,7 @@
 package org.company;
 
-import org.company.model.Participant;
+import org.company.model.Auction;
+import org.company.model.User;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -19,17 +20,23 @@ public class Server {
         /*read page in: https://www.codejava.net/java-core/collections/understanding-collections-and-thread-safety-in-java*/
         /*we retrieve a collection that is thread-safe. That way we avoid ConcurrentModificationException and
           general problems like race condition*/
-        List<Participant> participantsList = Collections.synchronizedList(new ArrayList<>());
 
-        System.out.println("Server is listening.");
+        List<User> usersList = Collections.synchronizedList(new ArrayList<>());
+        List<Auction> auctionsList = Collections.synchronizedList(new ArrayList<>());
+
+        System.out.println("Server has started.");
         try {
             ServerSocket serverSocket = new ServerSocket(inPort);
-//          listens forever for connections
+            // Listens forever for connections.
             while (true) {
+                System.out.println("Server is listening for new connections...");
                 connectionSocket = serverSocket.accept();
-                System.out.println("User with ip " + connectionSocket.getInetAddress() + " has now joined.");
-                new Thread(new ConnectionHandler(connectionSocket)).start();
-                System.out.println("what happens");
+                System.out.println("User with IP " + connectionSocket.getInetAddress().getHostAddress() + " has now joined.");
+                // Add user to the server users.
+                usersList.add(User.builder()
+                        .IPAddress(connectionSocket.getInetAddress().getHostAddress())
+                        .build());
+                new Thread(new ConnectionHandler(connectionSocket, auctionsList)).start();
             }
         } catch (IOException e) {
             e.printStackTrace();
