@@ -8,21 +8,22 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 @Builder
 public class Auction implements Serializable {
 
-    private int auctionID = counter;
+    private int auctionID;
     private Item itemOnSale;
     private AuctionClosingType closingType;
+    private User owner;
 
     // this counter belongs to the class and helps us for the generation of unique auction IDs'.
-    private static int counter;
+    public static int counter = 0;
 
     // every time that a new auction is being created, the counter is incremented (just like
     // the 'auto increment' fields in databases).
-    private static void incrementCounter() {
+    public static void incrementCounter() {
         counter++;
     }
 

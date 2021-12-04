@@ -33,10 +33,12 @@ public class Server {
                 connectionSocket = serverSocket.accept();
                 System.out.println("User with IP " + connectionSocket.getInetAddress().getHostAddress() + " has now joined.");
                 // Add user to the server users.
+                User.incrementCounter();
                 usersList.add(User.builder()
-                        .IPAddress(connectionSocket.getInetAddress().getHostAddress())
+                        .username("User" + User.counter)
+                        .IPAddress(connectionSocket.getInetAddress())
                         .build());
-                new Thread(new ConnectionHandler(connectionSocket, auctionsList)).start();
+                new Thread(new ConnectionHandler(connectionSocket, auctionsList, usersList, "User" + User.counter)).start();
             }
         } catch (IOException e) {
             e.printStackTrace();
