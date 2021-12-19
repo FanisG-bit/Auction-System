@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -17,6 +19,9 @@ public class Auction implements Serializable {
     private Item itemOnSale;
     private AuctionClosingType closingType;
     private User owner;
+    private List<User> participants;
+    // all the bids placed for this particular auction: user -> bid (number/how much money, time placed).
+    private HashMap<User, Bid> bidsPlaced;
 
     // this counter belongs to the class and helps us for the generation of unique auction IDs'.
     public static int counter = 0;

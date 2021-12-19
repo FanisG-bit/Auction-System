@@ -1,23 +1,28 @@
 package org.company;
 
 import org.company.model.Auction;
+import org.company.model.Bid;
 import org.company.model.User;
 import org.company.service.TCPPacketInteraction;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 public class ConnectionHandler implements Runnable {
 
     private Socket client;
+    // IGNORE BELOW COMMENT FOR NOW BECAUSE IT'S PROBABLY INCORRECT
     // 'place a bid' and 'withdraw from an auction' are excluded from the list below, since they are operations
     // that take place after registering (participating) on an auction.
     private String listOfValidCommands = "List of valid commands (use '?' before entering one e.g. ?command):\n" +
-            "placeItemForAuction,\nlistActiveAuctions,\nparticipateInAuction,\ncheckHighestBid,\ndisconnect.\n";
+            "placeItemForAuction,\nlistActiveAuctions,\nparticipateInAuction,\nplaceABid,\ncheckHighestBid,\ndisconnect.\n";
     private String[] commands = new String[]{"placeItemForAuction", "listActiveAuctions", "participateInAuction",
-            "checkHighestBid", "disconnect"};
+            "placeABid", "checkHighestBid", "disconnect"};
     // reference to the list of all the auctions that are currently on the server.
     private List<Auction> auctionsList;
     // reference to the list of users that are currently on the server.
@@ -38,15 +43,15 @@ public class ConnectionHandler implements Runnable {
     public void run() {
         // the first thing is to send a welcome message to the client.
         try {
-            TCPPacketInteraction.sendPacket(client, "Welcome to the auction system! You're identified as '" +
-                    client.getInetAddress().getHostAddress() + "'\n");
-            TCPPacketInteraction.sendPacket(client, listOfValidCommands);
             // we then retrieve the object of the current user.
+            currentUser = retrieveUserBasedOnName();
+            TCPPacketInteraction.sendPacket(client, "Welcome to the auction system! You're identified as '" +
+                    currentUser.getUsername() + "'\n");
+            TCPPacketInteraction.sendPacket(client, listOfValidCommands);
             /*User user = retrieveUser();
             if (user != null) {
                 currentUser = user;
             }*/
-            currentUser = retrieveUserBasedOnName();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -68,7 +73,8 @@ public class ConnectionHandler implements Runnable {
                 System.out.println(auctionsList);
                 // System.out.println("Client's command is: " + clientCommand);
             } catch (IOException | ClassNotFoundException e) {
-                System.err.println("User with IP " + client.getInetAddress() + " disconnected.");
+                //System.err.println("User with IP " + client.getInetAddress() + " disconnected.");
+                System.err.println("User with username '" + currentUser.getUsername() + "' disconnected.");
                 break;
             }
         }
@@ -108,6 +114,8 @@ public class ConnectionHandler implements Runnable {
                             Auction.incrementCounter();
                             clientNewAuction.setAuctionID(Auction.counter);
                             clientNewAuction.setOwner(currentUser);
+                            clientNewAuction.setParticipants(new ArrayList<>());
+                            clientNewAuction.setBidsPlaced(new HashMap<>());
                             auctionsList.add(clientNewAuction);
                             break;
                         } else {
@@ -118,6 +126,55 @@ public class ConnectionHandler implements Runnable {
                         e.printStackTrace();
                     }
                 }
+            break;
+            case "?listActiveAuctions":
+                try {
+                    TCPPacketInteraction.sendPacket(client, auctionsList);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            break;
+            case "?participateInAuction":
+                try {
+                    TCPPacketInteraction.sendPacket(client, auctionsList);
+                    TCPPacketInteraction.sendPacket(client, currentUser);
+                    int auctionID = (int) TCPPacketInteraction.receivePacket(client);
+                    if (auctionID == -1) {
+                        // operation has been abandoned by the user.
+                        // we break from the switch.
+                        break;
+                    } else {
+                        auctionID--; // that is because list index starts from 0 but auction IDs start from 1 and increment.
+                        auctionsList.get(auctionID).getParticipants().add(currentUser);
+                    }
+                } catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+            break;
+            case "?placeABid":
+                try {
+                    TCPPacketInteraction.sendPacket(client, auctionsList);
+                    TCPPacketInteraction.sendPacket(client, currentUser);
+                    int auctionID = (int) TCPPacketInteraction.receivePacket(client);
+                    if (auctionID == -1) {
+                        // operation has been abandoned by the user on the state of CHOOSING AN AUCTION.
+                        break;
+                    } else {
+                        double clientOffer = (double) TCPPacketInteraction.receivePacket(client);
+                        if (clientOffer == -1) {
+                            // operation has been abandoned by the user on the state of PLACING AN OFFER.
+                            break;
+                        } else {
+                            auctionID--;
+                            auctionsList.get(auctionID)
+                                    .getBidsPlaced()
+                                    .put(currentUser, new Bid(clientOffer, LocalTime.now()));
+                        }
+                    }
+                } catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+            break;
         }
     }
 

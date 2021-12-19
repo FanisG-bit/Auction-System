@@ -6,15 +6,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.time.LocalTime;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Item implements Serializable {
+public class Bid implements Serializable {
 
-    private String itemName;
-    private String itemDescription;
-    private double itemStartingPrice;
+    private double bidValue; // the actual number (how much money are placed).
+    private LocalTime timeBidPlaced;
 
 }
