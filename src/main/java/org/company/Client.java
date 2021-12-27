@@ -1,18 +1,12 @@
 package org.company;
 
 import org.company.exceptions.*;
-import org.company.model.Auction;
-import org.company.model.Bid;
-import org.company.model.Item;
-import org.company.model.User;
+import org.company.model.*;
 import org.company.service.TCPPacketInteraction;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.InputMismatchException;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class Client {
 
@@ -49,6 +43,12 @@ public class Client {
             String listOfValidCommands = (String) TCPPacketInteraction.receivePacket(clientSocket);
             System.out.println(listOfValidCommands);
             while (true) {
+                // TODO Receive user's object just to check the notification system.
+                //  If that works then we should refactor so that we can have some methods of the client
+                //  as class in services. And a lot of other stuff!
+                if () {
+
+                }
                 System.out.println("Type a valid command: ");
                 String command = scanner.nextLine();
                 // send the user's command to the server
@@ -96,6 +96,61 @@ public class Client {
                                         }
                                     } while (!isItemPriceValid);
                                     scanner.nextLine();
+                                    // We just the below with something, so that we won't be notified that the closingType
+                                    // variable may not be initialised (later on in the builder of the auction object).
+                                    String closingType = "";
+                                    boolean isClosingTypeValid = false;
+                                    System.out.println("Select one of the ways of closing the auction.\n" +
+                                            "TYPE1 : Run for specific amount of time. When time ends, the participant " +
+                                            "with the highest bid will get the item.\nTYPE2 : The auction will continue " +
+                                            "as long as bids are placed.\nPlease type one of the options (e.g. TYPE1): ");
+                                    do {
+                                        try {
+                                            closingType = scanner.nextLine();
+                                            if (!closingType.equalsIgnoreCase("TYPE1")
+                                                    && !closingType.equalsIgnoreCase("TYPE2")) {
+                                                throw new SelectedClosingTypeMismatchException("One of the mentioned closing " +
+                                                        "types should be selected.\nPlease type the way of closing the auction " +
+                                                        "(either TYPE1 or TYPE2):");
+                                            }
+                                            isClosingTypeValid = true;
+                                        } catch (SelectedClosingTypeMismatchException e) {
+                                            System.out.println(e.getMessage());
+                                        }
+                                    }while(!isClosingTypeValid);
+                                    String timerMessage = closingType.equalsIgnoreCase("TYPE1")
+                                            ? "Your auction will run for a specified amount of time.\nPlease type the " +
+                                            "number of seconds in which the auction will be active (1 minute = 60 seconds," +
+                                            "1 hour = 3600 seconds etc.): "
+                                            : ""; // TODO write appropriate message.
+                                    int timer = 0;
+                                    boolean isTimerValid;
+                                    do {
+                                        try {
+                                            System.out.println(timerMessage);
+                                            timer = scanner.nextInt();
+                                            if (timer <= 0) {
+                                                throw new TimerNegativeValueOrZeroException("Timer must consist of a " +
+                                                        "positive numerical value bigger than zero (0): ");
+                                            }
+                                            isTimerValid = true;
+                                        } catch(InputMismatchException e) {
+                                            System.out.println("Timer must consist of a numeric value.");
+                                            isTimerValid = false;
+                                            // By having the line below (and in several other occasions), we protect our
+                                            // program from getting into an infinite loop. That happens because after
+                                            // reading either int or double from the keyboard, the scanner skips once
+                                            // the next time that it attempts to read something from the user. This is
+                                            // a very common issue with the scanners. More info here ->
+                                            // https://stackoverflow.com/questions/13102045/scanner-is-skipping-nextline-after-using-next-or-nextfoo
+                                            scanner.nextLine();
+                                        } catch (TimerNegativeValueOrZeroException e) {
+                                            System.out.println(e.getMessage());
+                                            isTimerValid = false;
+                                            scanner.nextLine();
+                                        }
+                                    }while(!isTimerValid);
+                                    scanner.nextLine();
                                     // we firstly create the auction by calling the no args constructor in order to increment
                                     // the counter and set the auctionID.
                                     Auction auction = Auction.builder()
@@ -104,8 +159,11 @@ public class Client {
                                                     .itemDescription(itemDescription)
                                                     .itemStartingPrice(itemPrice)
                                                     .build())
+                                            .closingType(closingType.equalsIgnoreCase("TYPE1")
+                                                    ? AuctionClosingType.SPECIFIED_TIME_SET
+                                                    : AuctionClosingType.BID_STARTS_TIMER)
+                                            .closingTimer(timer)
                                             .build();
-                                    // TODO also the client needs to set the way that the auction will close
                                     // send that the server should proceed with the operation
                                     TCPPacketInteraction.sendPacket(clientSocket, true);
                                     // send the newly created auction to the server
@@ -131,7 +189,7 @@ public class Client {
                                     System.out.println(auction.getAuctionID() + ", " + auction.getItemOnSale().getItemName()
                                             + ", " + auction.getItemOnSale().getItemDescription() + ", " +
                                             auction.getItemOnSale().getItemStartingPrice() + ", " +
-                                            getHighestBidPlacedInAuction(auctionList, auction.getAuctionID())
+                                            getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()).getBidValue()
                                             + ", " + auction.getOwner().getUsername());
                                 }
                                 System.out.println("\n");
@@ -173,12 +231,12 @@ public class Client {
                                                 "placeABid");
                             if (auctionID1 != -1) {
                                 TCPPacketInteraction.sendPacket(clientSocket, auctionID1);
-                                double maxBid = getHighestBidPlacedInAuction(auctionList1, auctionID1);
+                                Bid maxBid = getHighestBidPlacedInAuction(auctionList1, auctionID1);
                                 // we don't need to try-catch for NullPointerException at the line below, since at
                                 // this point of the program the auctionID will certainly match an already existing
                                 // auction.
                                 double itemStartingPrice = getAuctionItemStartingPrice(auctionList1, auctionID1);
-                                boolean isOfferValid = true;
+                                boolean isOfferValid;
                                 String offerStr;
                                 double offer;
                                 do {
@@ -188,16 +246,18 @@ public class Client {
                                         offer = Double.parseDouble(offerStr);
                                         if (offer == -1) {
                                             // we cancel the offer.
-                                            TCPPacketInteraction.sendPacket(clientSocket, -1);
+                                            TCPPacketInteraction.sendPacket(clientSocket, offer);
                                             System.out.println("Cancelled offer.");
                                             break;
                                         }
                                         // if max bid is equal to -1 it means that there are no bids for that auction
                                         // yet. So, we want the next message to be displayed.
-                                        if (maxBid != -1) {
-                                            if (offer <= maxBid) {
-                                                throw new BidInsufficientException("There is a higher bid for this item " +
-                                                        "placed by another user. Your bid was not submitted.");
+                                        if (maxBid.getBidValue() != -1) {
+                                            if (offer <= maxBid.getBidValue()) {
+                                                throw new BidInsufficientException("User with name: '" +
+                                                        getUserWhoPlacedBid(auctionList1, auctionID1, maxBid).getUsername() +
+                                                        "' has placed the largest bid of value: '" + maxBid.getBidValue() +
+                                                        "'\nOffer was not submitted.");
                                             }
                                         }
                                         if (offer < itemStartingPrice) {
@@ -222,6 +282,82 @@ public class Client {
                                 } while (!isOfferValid);
                             }
                         break;
+                        case "?checkHighestBid":
+                            List<Auction> auctionList2 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
+                            // For The exception message argument/parameter, we do not really care what value it will have since we won't
+                            // be needing this in this case/command.
+                            int auctionID2 = handleAuctionIdInput(scanner,
+                                    clientSocket,
+                                    auctionList2,
+                                    null,
+                                    "...",
+                                    "checkHighestBid");
+                            if (auctionID2 != -1) {
+                                Bid highestBid = getHighestBidPlacedInAuction(auctionList2, auctionID2);
+                                if (highestBid.getBidValue() != -1) {
+                                    System.out.println("The highest bid for the auction with id=" + auctionID2 + " is " +
+                                            highestBid.getBidValue() + " and was placed at " + highestBid.getTimeBidPlaced());
+                                } else {
+                                    System.out.println("There are not bids placed for the specified auction.");
+                                }
+                                // We have to send to the server any Integer value other than -1. That is because the
+                                // server is waiting for a response from the user, since the user may abandon the
+                                // operation. In the case of abandoning, the "handleAuctionIdInput" handles it and sends
+                                // -1. In the success scenario, the server is waiting. That's why we need to send something.
+                                TCPPacketInteraction.sendPacket(clientSocket, 1);
+                            }
+                        break;
+                        case "?withdrawFromAuction":
+                            List<Auction> auctionList3 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
+                            User thisUser3 = (User) TCPPacketInteraction.receivePacket(clientSocket);
+                            int auctionID3 = handleAuctionIdInput(scanner,
+                                    clientSocket,
+                                    auctionList3,
+                                    thisUser3,
+                                    "You cannot withdraw from an auction that was created by you.",
+                                    "withdrawFromAuction");
+                            if (auctionID3 != -1) {
+                                if (!thisUser3.equals(
+                                        getUserWhoPlacedBid(auctionList3, auctionID3,
+                                                getHighestBidPlacedInAuction(auctionList3, auctionID3)))) {
+                                    System.out.println("You have successfully withdrawn from this auction!");
+                                    TCPPacketInteraction.sendPacket(clientSocket, auctionID3);
+                                }
+                                else {
+                                    System.out.println("You have the highest bid in this particular auction." +
+                                            "You cannot withdraw until it finishes or someone else places a higher" +
+                                            " bid.");
+                                    TCPPacketInteraction.sendPacket(clientSocket, -1);
+                                }
+                            }
+                        break;
+                        case "?disconnect":
+                            List<Auction> auctionList4 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
+                            User thisUser4 = (User) TCPPacketInteraction.receivePacket(clientSocket);
+                            List<Auction> auctionsInWhichUserHighestBidder = checkIfHighestBidder(auctionList4, thisUser4);
+                            if (!auctionsInWhichUserHighestBidder.isEmpty()) {
+                                // It was advised by the IDE to replace += with append of the string builder.
+                                StringBuilder auctionIDs = new StringBuilder("[");
+                                for(int i=0; i<auctionsInWhichUserHighestBidder.size(); i++) {
+                                    if (i != auctionsInWhichUserHighestBidder.size() - 1) {
+                                        auctionIDs.append(auctionsInWhichUserHighestBidder.get(i).getAuctionID()).append(", ");
+                                    }
+                                    else {
+                                        auctionIDs.append(auctionsInWhichUserHighestBidder.get(i).getAuctionID()).append("]");
+                                    }
+                                }
+                                System.out.println("You cannot currently disconnect from the system.\nYou have the " +
+                                        "highest bid in the auction(s) with IDs' = " + auctionIDs);
+                                TCPPacketInteraction.sendPacket(clientSocket, false);
+                            }
+                            else {
+                                // User can disconnect from the system.
+                                TCPPacketInteraction.sendPacket(clientSocket, true);
+                                String goodbyeMessage = (String) TCPPacketInteraction.receivePacket(clientSocket);
+                                System.out.println(goodbyeMessage);
+                                System.exit(0);
+                            }
+                            break;
                     }
                 }
             }
@@ -229,6 +365,23 @@ public class Client {
             System.err.println("Connection refused.\nServer is probably closed or under maintenance.");
         }
 
+    }
+
+    private static List<Auction> checkIfHighestBidder(List<Auction> auctionList, User thisUser) {
+        List<Auction> auctionsInWhichUserHighestBidder = new ArrayList<>();
+        for (Auction auction:
+             auctionList) {
+            if (auction.getParticipants().contains(thisUser)) {
+                if (getUserWhoPlacedBid(auctionList,
+                                        auction.getAuctionID(),
+                                        getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()))
+                                        .equals(thisUser))
+                {
+                    auctionsInWhichUserHighestBidder.add(auction);
+                }
+            }
+        }
+        return auctionsInWhichUserHighestBidder;
     }
 
     private static double getAuctionItemStartingPrice(List<Auction> auctionList, int auctionID) throws NullPointerException {
@@ -242,10 +395,16 @@ public class Client {
         return thisAuction.getItemOnSale().getItemStartingPrice();
     }
 
-    private static double getHighestBidPlacedInAuction(List<Auction> auctionList, int auctionID) {
+    private static Bid getHighestBidPlacedInAuction(List<Auction> auctionList, int auctionID) {
         HashMap<User, Bid> bidsPlaced = null;
-        // if value stays at -1 it means that there are currently no bids on the specified auction.
-        double maxBidValue = -1;
+        // The method will return the bid with a value of -1 in the case that there are
+        // no bids placed.
+        // The bidsPlaced which is initiated as null could produce a (Null) Exception but in
+        // the way that it is being used in this program, there is no way that this
+        // could happen, since we have already checked that the auctionID exists.
+        Bid maxBid = Bid.builder()
+                        .bidValue(-1.0)
+                        .build();
         for (Auction auction:
                 auctionList) {
             if (auction.getAuctionID() == auctionID) {
@@ -254,17 +413,37 @@ public class Client {
         }
         if (bidsPlaced != null) {
             if (bidsPlaced.isEmpty()) {
-                return -1;
+                return maxBid;
             } else {
                 for (Bid bid:
                         bidsPlaced.values()) {
-                    if (maxBidValue < bid.getBidValue()) {
-                        maxBidValue = bid.getBidValue();
+                    if (maxBid.getBidValue() < bid.getBidValue()) {
+                        maxBid = bid;
                     }
                 }
             }
         }
-        return maxBidValue;
+        return maxBid;
+    }
+
+    private static User getUserWhoPlacedBid(List<Auction> auctionList, int auctionID, Bid bid) {
+        // Retrieve key (user) based on value (bid).
+        // Got inspiration from -> https://www.baeldung.com/java-map-key-from-value
+        HashMap<User, Bid> bidsPlaced = null;
+        for (Auction auction:
+                auctionList) {
+            if (auction.getAuctionID() == auctionID) {
+                bidsPlaced = auction.getBidsPlaced();
+            }
+        }
+        User userWhoPlacedThatBid = null;
+        for (Map.Entry<User, Bid> entry:
+             bidsPlaced.entrySet()) {
+            if (entry.getValue().equals(bid)) {
+                userWhoPlacedThatBid = entry.getKey();
+            }
+        }
+        return userWhoPlacedThatBid;
     }
 
     private static int handleAuctionIdInput(Scanner scanner,
@@ -276,7 +455,7 @@ public class Client {
                                              throws IOException {
         String auctionIDStr;
         int auctionID = -1;
-        boolean isAuctionIDValid = true;
+        boolean isAuctionIDValid;
         do {
             if (operationName.equals("participateInAuction")) {
                 System.out.println("Type the ID of the auction that you wish to participate or -1" +
@@ -284,6 +463,12 @@ public class Client {
             } else if (operationName.equals("placeABid")) {
                 System.out.println("Type the ID of the auction that you wish to place a bid " +
                         "or -1 to abandon operation:");
+            } else if (operationName.equals("checkHighestBid")) {
+                System.out.println("Type the ID of the auction that you wish to see the " +
+                        "highest bid placed or -1 to abandon operation:");
+            } else if (operationName.equals("withdrawFromAuction")) {
+                System.out.println("Type the ID of the auction from which you wish to withdraw" +
+                        " or -1 to abandon operation:");
             }
             auctionIDStr = scanner.nextLine();
             try {
@@ -299,11 +484,17 @@ public class Client {
                             auctionList) {
                         if (auction.getAuctionID() == auctionID) {
                             isInList = true;
-                            if(auction.getOwner().getUsername().equals(thisUser.getUsername())) {
-                                isOwnedByUser = true;
-                                break;
+                            // we write the below statement because in the case of command "checkHighestBid" etc.
+                            // we do not pass a user because it is not needed. That way we ensure that we won't get
+                            // an exception (thisUser being null).
+                            if (thisUser != null) {
+                                if (auction.getOwner().getUsername().equals(thisUser.getUsername())) {
+                                    isOwnedByUser = true;
+                                    break;
+                                }
                             }
-                            if (operationName.equals("participateInAuction") || operationName.equals("placeABid")) {
+                            if (operationName.equals("participateInAuction") || operationName.equals("placeABid")
+                                    || operationName.equals("withdrawFromAuction")) {
                                 isUserInParticipants = isUserInParticipants(auctionList, thisUser, auctionID);
                                 break;
                             }
@@ -332,8 +523,14 @@ public class Client {
                 }
                 if (operationName.equals("placeABid")) {
                     if (!isUserInParticipants) {
-                        throw new UserBidsOwnAuctionException("You cannot place a bid in an auction in which you" +
+                        throw new UserNotAuctionParticipantException("You cannot place a bid in an auction in which you" +
                                 " are not a participant. You need to join first.");
+                    }
+                }
+                if (operationName.equals("withdrawFromAuction")) {
+                    if (!isUserInParticipants) {
+                        throw new UserNotAuctionParticipantException("You cannot withdraw from an auction in which" +
+                                "you are not a participant. You need to join first.");
                     }
                 }
                 // if execution reaches this point, then it means that nothing went bad (no exceptions or operation
@@ -343,7 +540,7 @@ public class Client {
             } catch (NumberFormatException e) {
                 System.out.println("Auction ID must consist of a numeric value.");
                 isAuctionIDValid = false;
-            } catch (AuctionIdNotInListException | UserJoinsOwnAuctionException | UserAlreadyInAuctionException | UserBidsOwnAuctionException e) {
+            } catch (AuctionIdNotInListException | UserJoinsOwnAuctionException | UserAlreadyInAuctionException | UserNotAuctionParticipantException e) {
                 System.out.println(e.getMessage());
                 isAuctionIDValid = false;
             }

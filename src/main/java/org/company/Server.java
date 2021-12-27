@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Stack;
 
 public class Server {
 
@@ -36,12 +37,10 @@ public class Server {
                 usersList.add(User.builder()
                         .username("User" + User.counter)
                         .IPAddress(connectionSocket.getInetAddress())
+                        .userInbox(new Stack<>())
                         .build());
                 System.out.println("User with username User" + User.counter + " has now joined.");
                 new Thread(new ConnectionHandler(connectionSocket, auctionsList, usersList, "User" + User.counter)).start();
-                // TODO maybe create a new thread with a class ConnectionMultiTransmission that will be used when trying
-                //  to send a message to all users at any time (e.g. when someone bids). Inside the connection handler
-                //  it will be created. try with resources etc.
             }
         } catch (IOException e) {
             e.printStackTrace();

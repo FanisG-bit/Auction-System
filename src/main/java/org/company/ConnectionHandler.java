@@ -1,17 +1,18 @@
 package org.company;
 
 import org.company.model.Auction;
+import org.company.model.AuctionClosingType;
 import org.company.model.Bid;
 import org.company.model.User;
+import org.company.service.DisconnectHandler;
 import org.company.service.TCPPacketInteraction;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.time.ZoneId;
+import java.util.*;
 
 public class ConnectionHandler implements Runnable {
 
@@ -20,9 +21,10 @@ public class ConnectionHandler implements Runnable {
     // 'place a bid' and 'withdraw from an auction' are excluded from the list below, since they are operations
     // that take place after registering (participating) on an auction.
     private String listOfValidCommands = "List of valid commands (use '?' before entering one e.g. ?command):\n" +
-            "placeItemForAuction,\nlistActiveAuctions,\nparticipateInAuction,\nplaceABid,\ncheckHighestBid,\ndisconnect.\n";
+            "placeItemForAuction,\nlistActiveAuctions,\nparticipateInAuction,\nplaceABid,\ncheckHighestBid,\nwithdrawFromAuction," +
+            "\ndisconnect.\n";
     private String[] commands = new String[]{"placeItemForAuction", "listActiveAuctions", "participateInAuction",
-            "placeABid", "checkHighestBid", "disconnect"};
+            "placeABid", "checkHighestBid", "withdrawFromAuction", "disconnect"};
     // reference to the list of all the auctions that are currently on the server.
     private List<Auction> auctionsList;
     // reference to the list of users that are currently on the server.
@@ -117,6 +119,20 @@ public class ConnectionHandler implements Runnable {
                             clientNewAuction.setParticipants(new ArrayList<>());
                             clientNewAuction.setBidsPlaced(new HashMap<>());
                             auctionsList.add(clientNewAuction);
+                            // The lines below refer to the first way of closing an auction where we set a timer and after
+                            // that timer finishes, the highest bidder gets the item.
+                            LocalDateTime afterHowManySecondsItCloses =
+                                    LocalDateTime.now().plusSeconds(clientNewAuction.getClosingTimer());
+                            // We convert the LocalDateTime to a Date object since that is the only acceptable form of
+                            // the second parameter. The steps are:
+                            // - convert LocalDateTime to ZonedDateTime,
+                            // - pass the system's default time-zone as the argument of the atZone method,
+                            // - convert ZonedDateTime to an Instant object,
+                            // - obtain an instance of Date from the Instant object by using the Date.from
+                            // Help was acquired from -> https://www.baeldung.com/java-date-to-localdate-and-localdatetime
+                            new Timer().schedule(new DisconnectHandler(AuctionClosingType.SPECIFIED_TIME_SET, auctionsList,
+                                            clientNewAuction, currentUser, usersList),
+                                    Date.from(afterHowManySecondsItCloses.atZone(ZoneId.systemDefault()).toInstant()));
                             break;
                         } else {
                             // user abandons operation, so the loop breaks without something happening
@@ -170,6 +186,59 @@ public class ConnectionHandler implements Runnable {
                                     .getBidsPlaced()
                                     .put(currentUser, new Bid(clientOffer, LocalTime.now()));
                         }
+                    }
+                } catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+            break;
+            case "?checkHighestBid":
+                try {
+                    TCPPacketInteraction.sendPacket(client, auctionsList);
+                    int auctionID = (int) TCPPacketInteraction.receivePacket(client);
+                    // Operation has been abandoned by the user. Not sure if the break is needed
+                    // at this point. Most probably not. There is also nothing that the server
+                    // can do with the response from the client.
+                    // We have to retrieve a response just because in the client, we use the
+                    // "handleAuctionIdInput" method which sends -1 to the server, if the operation is
+                    // abandoned by the user while choosing for an auction.
+                    if (auctionID == -1) {
+                        break;
+                    }
+                } catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+            break;
+            case "?withdrawFromAuction":
+                try {
+                    TCPPacketInteraction.sendPacket(client, auctionsList);
+                    TCPPacketInteraction.sendPacket(client, currentUser);
+                    int auctionID = (int) TCPPacketInteraction.receivePacket(client);
+                    if (auctionID != -1) {
+                        // We remove (withdraw) the user from the specified auction.
+                        auctionID--;
+                        auctionsList.get(auctionID).getParticipants().remove(currentUser);
+                    }
+                } catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+            break;
+            case "?disconnect":
+                try {
+                    TCPPacketInteraction.sendPacket(client, auctionsList);
+                    TCPPacketInteraction.sendPacket(client, currentUser);
+                    boolean shouldDisconnect = (boolean) TCPPacketInteraction.receivePacket(client);
+                    if (shouldDisconnect) {
+                        // We remove the user from any auctions in which he/she is a participant.
+                        for (Auction auction:
+                             auctionsList) {
+                            if (auction.getParticipants().contains(currentUser)) {
+                                auction.getParticipants().remove(currentUser);
+                            }
+                        }
+                        // We also remove that person from the list that contains all the users currently
+                        // on the system.
+                        usersList.remove(currentUser);
+                        TCPPacketInteraction.sendPacket(client, "Goodbye!");
                     }
                 } catch (IOException | ClassNotFoundException e) {
                     e.printStackTrace();
