@@ -2,14 +2,12 @@ package org.company;
 
 import org.company.model.Auction;
 import org.company.model.User;
+import org.company.service.DisconnectHandler;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 public class Server {
 
@@ -24,6 +22,7 @@ public class Server {
 
         List<User> usersList = Collections.synchronizedList(new ArrayList<>());
         List<Auction> auctionsList = Collections.synchronizedList(new ArrayList<>());
+        Map<Auction, Timer> secondScenarioTimers = Collections.synchronizedMap(new HashMap<>());
 
         System.out.println("Server has started.");
         try {
@@ -40,7 +39,7 @@ public class Server {
                         .userInbox(new Stack<>())
                         .build());
                 System.out.println("User with username User" + User.counter + " has now joined.");
-                new Thread(new ConnectionHandler(connectionSocket, auctionsList, usersList, "User" + User.counter)).start();
+                new Thread(new ConnectionHandler(connectionSocket, auctionsList, usersList, "User" + User.counter, secondScenarioTimers)).start();
             }
         } catch (IOException e) {
             e.printStackTrace();
