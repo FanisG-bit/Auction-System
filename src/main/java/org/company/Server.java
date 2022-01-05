@@ -24,7 +24,7 @@ public class Server {
         List<Auction> auctionsList = Collections.synchronizedList(new ArrayList<>());
         Map<Auction, Timer> secondScenarioTimers = Collections.synchronizedMap(new HashMap<>());
 
-        System.out.println("Server has started.");
+        System.out.println("\nServer has started.");
         try {
             ServerSocket serverSocket = new ServerSocket(inPort);
             // Listens forever for connections.
@@ -32,11 +32,13 @@ public class Server {
                 System.out.println("Server is listening for new connections...");
                 connectionSocket = serverSocket.accept();
                 // Add user to the server users.
+                // Queue is an interface so, we cannot create one without implementing all the methods. That's why
+                // we choose one of the classes that implements it (LinkedList).
                 User.incrementCounter();
                 usersList.add(User.builder()
                         .username("User" + User.counter)
                         .IPAddress(connectionSocket.getInetAddress())
-                        .userInbox(new Stack<>())
+                        .userInbox(new LinkedList<>())
                         .build());
                 System.out.println("User with username User" + User.counter + " has now joined.");
                 new Thread(new ConnectionHandler(connectionSocket, auctionsList, usersList, "User" + User.counter, secondScenarioTimers)).start();

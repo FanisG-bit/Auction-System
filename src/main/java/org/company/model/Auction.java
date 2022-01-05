@@ -28,6 +28,8 @@ public class Auction implements Serializable {
     // this counter belongs to the class and helps us for the generation of unique auction IDs'.
     public static int counter = 0;
 
+    private AuctionStatus auctionStatus;
+
     // every time that a new auction is being created, the counter is incremented (just like
     // the 'auto increment' fields in databases).
     public static void incrementCounter() {

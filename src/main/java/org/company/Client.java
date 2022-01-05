@@ -3,11 +3,16 @@ package org.company;
 import org.company.exceptions.*;
 import org.company.model.*;
 import org.company.service.ClientAuctionManagementOperations;
+import org.company.service.HandleInbox;
+import org.company.service.PrintInbox;
 import org.company.service.TCPPacketInteraction;
 
 import java.io.IOException;
 import java.net.Socket;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class Client {
 
@@ -18,19 +23,24 @@ public class Client {
         Scanner scanner = new Scanner(System.in);
 
         String inputFromUser;
-        System.out.println("""
-                    \t\t\tClientSideMenu
-                    --------------------------------------
-                    ?connect
-                    ?exit""");
+        System.out.println("""            
+                                
+                \t\t\tClientSideMenu
+                --------------------------------------
+                ?connect
+                ?exit
+                """);
         do {
-            System.out.println("\nType a Menu command: ");
+            System.out.println("Type a Menu command (make sure to include '?' at the front): ");
             inputFromUser = scanner.nextLine();
             switch (inputFromUser) {
                 case "?connect":
-                    break;
+                break;
                 case "?exit":
                     System.exit(0);
+                break;
+                default:
+                    System.out.println("Not a valid menu command.");
             }
         } while (!inputFromUser.equals("?connect") && !inputFromUser.equals("?exit"));
 
@@ -39,17 +49,17 @@ public class Client {
             Socket clientSocket = new Socket(serverIP, outPort);
             // Receive welcome message from the server upon connection.
             String welcomeMessage = (String) TCPPacketInteraction.receivePacket(clientSocket);
-            System.out.println(welcomeMessage);
+            System.out.println("\n" + welcomeMessage);
             // Receive valid commands that the user can use in order to perform operations.
             String listOfValidCommands = (String) TCPPacketInteraction.receivePacket(clientSocket);
             System.out.println(listOfValidCommands);
             while (true) {
 
-                User thisUser = (User) TCPPacketInteraction.receivePacket(clientSocket);
+                /*User thisUser = (User) TCPPacketInteraction.receivePacket(clientSocket);
 
                 if (!thisUser.getUserInbox().isEmpty()) {
-                    System.out.println(thisUser.getUserInbox().pop());
-                }
+                    System.out.println(thisUser.getUserInbox().peek());
+                }*/
 
                 System.out.println("Type a valid command: ");
                 String command = scanner.nextLine();
@@ -183,18 +193,28 @@ public class Client {
                             break;
                         case "?listActiveAuctions":
                             List<Auction> auctionList = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
-                            if (!auctionList.isEmpty()) {
+                            boolean atLeastOneOpen = false;
+                            for (Auction auction:
+                                 auctionList) {
+                                if (auction.getAuctionStatus().equals(AuctionStatus.OPEN)) {
+                                    atLeastOneOpen = true;
+                                    break;
+                                }
+                            }
+                            if (!auctionList.isEmpty() && atLeastOneOpen) {
                                 System.out.println("\nAuction ID, Item Name, Item Description, Starting Price, " +
                                         "Highest Bid, Seller's Name");
                                 for (Auction auction :
                                         auctionList) {
-                                    System.out.println("----------------------------------------------------------" +
-                                            "-------------------------");
-                                    System.out.println(auction.getAuctionID() + ", " + auction.getItemOnSale().getItemName()
-                                            + ", " + auction.getItemOnSale().getItemDescription() + ", " +
-                                            auction.getItemOnSale().getItemStartingPrice() + ", " +
-                                            ClientAuctionManagementOperations.getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()).getBidValue()
-                                            + ", " + auction.getOwner().getUsername());
+                                    if (auction.getAuctionStatus().equals(AuctionStatus.OPEN)) {
+                                        System.out.println("----------------------------------------------------------" +
+                                                "-------------------------");
+                                        System.out.println(auction.getAuctionID() + ", " + auction.getItemOnSale().getItemName()
+                                                + ", " + auction.getItemOnSale().getItemDescription() + ", " +
+                                                auction.getItemOnSale().getItemStartingPrice() + ", " +
+                                                ClientAuctionManagementOperations.getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()).getBidValue()
+                                                + ", " + auction.getOwner().getUsername());
+                                    }
                                 }
                                 System.out.println("\n");
                             } else {
@@ -329,7 +349,7 @@ public class Client {
                                 }
                                 else {
                                     System.out.println("You have the highest bid in this particular auction." +
-                                            "You cannot withdraw until it finishes or someone else places a higher" +
+                                            " You cannot withdraw until it finishes or someone else places a higher" +
                                             " bid.");
                                     TCPPacketInteraction.sendPacket(clientSocket, -1);
                                 }
@@ -361,6 +381,20 @@ public class Client {
                                 System.out.println(goodbyeMessage);
                                 System.exit(0);
                             }
+                        break;
+                        case "?readInbox":
+                            TCPPacketInteraction.sendPacket(clientSocket, true);
+                            User thisUser = (User) TCPPacketInteraction.receivePacket(clientSocket);
+                            ExecutorService executorService = Executors.newSingleThreadExecutor();
+                            PrintInbox printInbox = new PrintInbox(thisUser);
+                            Future<Boolean> future = executorService.submit(printInbox);
+                            while (!future.isDone()) {
+                                TCPPacketInteraction.sendPacket(clientSocket, true);
+                                User updatedUser = (User) TCPPacketInteraction.receivePacket(clientSocket);
+                                printInbox.setUser(updatedUser);
+                            }
+                            executorService.shutdown();
+                            TCPPacketInteraction.sendPacket(clientSocket, false);
                         break;
                     }
                 }

@@ -20,9 +20,9 @@ public class ConnectionHandler implements Runnable {
     private Socket client;
     private String listOfValidCommands = "List of valid commands (use '?' before entering one e.g. ?command):\n" +
             "placeItemForAuction,\nlistActiveAuctions,\nparticipateInAuction,\nplaceABid,\ncheckHighestBid,\nwithdrawFromAuction," +
-            "\ndisconnect.\n";
+            "\nreadInbox,\ndisconnect.\n";
     private String[] commands = new String[]{"placeItemForAuction", "listActiveAuctions", "participateInAuction",
-            "placeABid", "checkHighestBid", "withdrawFromAuction", "disconnect"};
+            "placeABid", "checkHighestBid", "withdrawFromAuction", "readInbox", "disconnect"};
     // reference to the list of all the auctions that are currently on the server.
     private List<Auction> auctionsList;
     // reference to the list of users that are currently on the server.
@@ -55,11 +55,11 @@ public class ConnectionHandler implements Runnable {
         while (true) {
             try {
 
-                TCPPacketInteraction.sendPacket(client, currentUser);
+                /*TCPPacketInteraction.sendPacket(client, currentUser);
 
                 if (!currentUser.getUserInbox().isEmpty()) {
-                    currentUser.getUserInbox().pop();
-                }
+                    currentUser.getUserInbox().poll();
+                }*/
 
                 String clientCommand = (String) TCPPacketInteraction.receivePacket(client);
                 boolean clientCommandValid = ServerAuctionManagementOperations.isClientCommandValid(clientCommand, commands);

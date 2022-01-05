@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.net.InetAddress;
-import java.util.Stack;
+import java.util.Queue;
 
 @Data
 @NoArgsConstructor
@@ -17,7 +17,7 @@ public class User implements Serializable {
 
     private String username;
     private InetAddress IPAddress;
-    private Stack<String> userInbox;
+    private Queue<String> userInbox;
 
     public static int counter = 0;
 

@@ -1,9 +1,6 @@
 package org.company.service;
 
-import org.company.model.Auction;
-import org.company.model.AuctionClosingType;
-import org.company.model.Bid;
-import org.company.model.User;
+import org.company.model.*;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -50,6 +47,7 @@ public class ServerAuctionManagementOperations {
                             clientNewAuction.setOwner(currentUser);
                             clientNewAuction.setParticipants(new ArrayList<>());
                             clientNewAuction.setBidsPlaced(new HashMap<>());
+                            clientNewAuction.setAuctionStatus(AuctionStatus.OPEN);
                             auctionsList.add(clientNewAuction);
                             if (clientNewAuction.getClosingType().equals(AuctionClosingType.SPECIFIED_TIME_SET)) {
                                 // The lines below refer to the first way of closing an auction where we set a timer and after
@@ -230,6 +228,19 @@ public class ServerAuctionManagementOperations {
                 } catch (IOException | ClassNotFoundException e) {
                     e.printStackTrace();
                 }
+            break;
+            case "?readInbox":
+                boolean shouldContinue = true;
+                do {
+                    try {
+                        shouldContinue = (boolean) TCPPacketInteraction.receivePacket(client);
+                        if (shouldContinue) {
+                            TCPPacketInteraction.sendPacket(client, currentUser);
+                        }
+                    } catch (IOException | ClassNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                }while (shouldContinue);
             break;
         }
     }

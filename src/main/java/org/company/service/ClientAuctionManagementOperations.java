@@ -1,12 +1,7 @@
 package org.company.service;
 
-import org.company.exceptions.AuctionIdNotInListException;
-import org.company.exceptions.UserAlreadyInAuctionException;
-import org.company.exceptions.UserJoinsOwnAuctionException;
-import org.company.exceptions.UserNotAuctionParticipantException;
-import org.company.model.Auction;
-import org.company.model.Bid;
-import org.company.model.User;
+import org.company.exceptions.*;
+import org.company.model.*;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -22,7 +17,7 @@ public class ClientAuctionManagementOperations {
                 if (getUserWhoPlacedBid(auctionList,
                         auction.getAuctionID(),
                         getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()))
-                        .equals(thisUser))
+                        .equals(thisUser) && auction.getAuctionStatus().equals(AuctionStatus.OPEN))
                 {
                     auctionsInWhichUserHighestBidder.add(auction);
                 }
@@ -123,6 +118,7 @@ public class ClientAuctionManagementOperations {
                 boolean isOwnedByUser = false;
                 boolean isOperationAbandoned = false;
                 boolean isUserInParticipants = false;
+                boolean isAuctionClosed = false;
                 if (auctionID == -1) {
                     isOperationAbandoned = true;
                 } else {
@@ -130,6 +126,9 @@ public class ClientAuctionManagementOperations {
                             auctionList) {
                         if (auction.getAuctionID() == auctionID) {
                             isInList = true;
+                            if (auction.getAuctionStatus().equals(AuctionStatus.CLOSED)) {
+                                isAuctionClosed = true;
+                            }
                             // we write the below statement because in the case of command "checkHighestBid" etc.
                             // we do not pass a user because it is not needed. That way we ensure that we won't get
                             // an exception (thisUser being null).
@@ -157,6 +156,10 @@ public class ClientAuctionManagementOperations {
                 if (!isInList) {
                     throw new AuctionIdNotInListException("Given Auction ID does not match to any " +
                             "auctions currently on the system.");
+                }
+                if (isAuctionClosed) {
+                    throw new AuctionIsClosedException("Given Auction ID match to an auction that is no longer " +
+                            "available. Please choose another one.");
                 }
                 if(isOwnedByUser) {
                     throw new UserJoinsOwnAuctionException(exceptionMessage);
@@ -186,7 +189,8 @@ public class ClientAuctionManagementOperations {
             } catch (NumberFormatException e) {
                 System.out.println("Auction ID must consist of a numeric value.");
                 isAuctionIDValid = false;
-            } catch (AuctionIdNotInListException | UserJoinsOwnAuctionException | UserAlreadyInAuctionException | UserNotAuctionParticipantException e) {
+            } catch (AuctionIdNotInListException | UserJoinsOwnAuctionException | UserAlreadyInAuctionException
+                    | UserNotAuctionParticipantException | AuctionIsClosedException e) {
                 System.out.println(e.getMessage());
                 isAuctionIDValid = false;
             }
