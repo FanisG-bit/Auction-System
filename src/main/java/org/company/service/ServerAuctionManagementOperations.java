@@ -127,9 +127,22 @@ public class ServerAuctionManagementOperations {
                             break;
                         } else {
                             auctionID--;
+
                             auctionsList.get(auctionID)
                                     .getBidsPlaced()
                                     .put(currentUser, new Bid(clientOffer, LocalTime.now()));
+
+                            // Notify all the participants
+                            int auctionIdPriorToDecrease = auctionID + 1;
+                            for (User participant:
+                                 auctionsList.get(auctionID).getParticipants()) {
+                                if (!participant.equals(currentUser)) {
+                                    participant.getUserInbox().add("Participant: " + currentUser.getUsername() + " made a bid of "
+                                             + clientOffer + " for the item " +
+                                            auctionsList.get(auctionID).getItemOnSale().getItemName() + " of the auction " +
+                                            "with ID=" + auctionIdPriorToDecrease + ".");
+                                }
+                            }
 
                             if (auctionsList.get(auctionID).getClosingType()
                                     .equals(AuctionClosingType.BID_STARTS_TIMER)) {

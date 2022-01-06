@@ -36,7 +36,7 @@ public class PrintInbox implements Callable<Boolean> {
                 }
             }
         }
-        executorService.shutdown(); // be careful to check again before leaving this here.
+        executorService.shutdown();
         return true;
     }
 

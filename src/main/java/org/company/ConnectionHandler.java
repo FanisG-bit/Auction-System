@@ -62,7 +62,12 @@ public class ConnectionHandler implements Runnable {
                 }*/
 
                 String clientCommand = (String) TCPPacketInteraction.receivePacket(client);
-                boolean clientCommandValid = ServerAuctionManagementOperations.isClientCommandValid(clientCommand, commands);
+                boolean clientCommandValid;
+                if (!clientCommand.isEmpty()) {
+                   clientCommandValid = ServerAuctionManagementOperations.isClientCommandValid(clientCommand, commands);
+                } else {
+                    clientCommandValid = false;
+                }
                 if (!clientCommandValid) {
                     TCPPacketInteraction.sendPacket(client, "Command is not valid. Please try again.");
                     // second argument could be replaced with 'clientCommandValid', but it is more clear writing
@@ -73,9 +78,9 @@ public class ConnectionHandler implements Runnable {
                     TCPPacketInteraction.sendPacket(client, true);
                     ServerAuctionManagementOperations.handleCommand(clientCommand, client, currentUser, usersList, auctionsList, secondScenarioTimers);
                 }
-                System.out.println(usersList);
-                System.out.println(auctionsList);
-                System.out.println(secondScenarioTimers);
+                // System.out.println(usersList);
+                // System.out.println(auctionsList);
+                // System.out.println(secondScenarioTimers);
                 // System.out.println("Client's command is: " + clientCommand);
             } catch (IOException | ClassNotFoundException e) {
                 //System.err.println("User with IP " + client.getInetAddress() + " disconnected.");

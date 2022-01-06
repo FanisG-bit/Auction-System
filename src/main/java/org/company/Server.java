@@ -24,7 +24,13 @@ public class Server {
         List<Auction> auctionsList = Collections.synchronizedList(new ArrayList<>());
         Map<Auction, Timer> secondScenarioTimers = Collections.synchronizedMap(new HashMap<>());
 
-        System.out.println("\nServer has started.");
+        System.out.println("""            
+                                
+                \t\t\tServerSideMenu
+                --------------------------------------
+                
+                """);
+        System.out.println("Server has started.");
         try {
             ServerSocket serverSocket = new ServerSocket(inPort);
             // Listens forever for connections.

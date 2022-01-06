@@ -41,7 +41,7 @@ public class DisconnectHandler extends TimerTask {
                 clientNewAuction.getOwner().getUserInbox().add("The item '" + clientNewAuction.getItemOnSale().getItemName()
                         + "' from the auction that was created by you with ID = " + clientNewAuction.getAuctionID()
                         + " was bought at the price of " + highestBid.getBidValue()
-                        + " from the User = '" + userWhoGainedItem.getUsername() + "'."
+                        + " by the User = '" + userWhoGainedItem.getUsername() + "'."
                 );
                 // we notify all the participants
                 for (User user :
@@ -55,7 +55,7 @@ public class DisconnectHandler extends TimerTask {
                         user.getUserInbox().add("The item '" + clientNewAuction.getItemOnSale().getItemName()
                                 + "' from the auction with ID = " + clientNewAuction.getAuctionID()
                                 + " was bought at the price of " + highestBid.getBidValue()
-                                + " from the User = '" + userWhoGainedItem.getUsername() + "'.");
+                                + " by the User = '" + userWhoGainedItem.getUsername() + "'.");
                     }
                 }
             } else {

@@ -246,6 +246,9 @@ public class Client {
                             // everytime we're changing variable names because they are already defined in the
                             // switch scope.
                             List<Auction> auctionList1 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
+                            //todo find why it doesn't receive the correct (updated list)
+                            // System.out.println(auctionList1);
+                            System.out.println(auctionList1);
                             User thisUser1 = (User) TCPPacketInteraction.receivePacket(clientSocket);
                             int auctionID1 = ClientAuctionManagementOperations.handleAuctionIdInput(scanner,
                                                  clientSocket,

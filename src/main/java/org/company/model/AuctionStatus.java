@@ -1,5 +1,7 @@
 package org.company.model;
 
-public enum AuctionStatus {
+import java.io.Serializable;
+
+public enum AuctionStatus implements Serializable {
     OPEN, CLOSED
 }

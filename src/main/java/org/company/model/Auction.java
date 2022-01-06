@@ -1,9 +1,6 @@
 package org.company.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -19,6 +16,7 @@ public class Auction implements Serializable {
     private Item itemOnSale;
     private AuctionClosingType closingType;
     private User owner;
+    @ToString.Exclude
     private List<User> participants;
     // all the bids placed for this particular auction: user -> bid (number/how much money, time placed).
     private HashMap<User, Bid> bidsPlaced;
