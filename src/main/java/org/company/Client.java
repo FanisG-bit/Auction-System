@@ -2,11 +2,8 @@ package org.company;
 
 import org.company.exceptions.*;
 import org.company.model.*;
-import org.company.service.ClientAuctionManagementOperations;
-import org.company.service.HandleInbox;
-import org.company.service.PrintInbox;
-import org.company.service.TCPPacketInteraction;
-
+import org.company.service.*;
+import org.company.threads.UserInboxPrinter;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.*;
@@ -14,14 +11,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+/** Represents a client.
+ *  @author Theofanis Gkoufas
+ */
+
 public class Client {
 
+    @SuppressWarnings("unchecked")
     public static void main(String[] args) {
 
         int outPort = 6666;
         String serverIP = "127.0.0.1";
         Scanner scanner = new Scanner(System.in);
-
         String inputFromUser;
         System.out.println("""            
                                 
@@ -30,6 +31,7 @@ public class Client {
                 ?connect
                 ?exit
                 """);
+        //noinspection ConstantConditions
         do {
             System.out.println("Type a Menu command (make sure to include '?' at the front): ");
             inputFromUser = scanner.nextLine();
@@ -43,7 +45,6 @@ public class Client {
                     System.out.println("Not a valid menu command.");
             }
         } while (!inputFromUser.equals("?connect") && !inputFromUser.equals("?exit"));
-
         try {
             // Actually this is the socket that has information about the server that the client wants to connect to.
             Socket clientSocket = new Socket(serverIP, outPort);
@@ -54,24 +55,18 @@ public class Client {
             String listOfValidCommands = (String) TCPPacketInteraction.receivePacket(clientSocket);
             System.out.println(listOfValidCommands);
             while (true) {
-
-                /*User thisUser = (User) TCPPacketInteraction.receivePacket(clientSocket);
-
-                if (!thisUser.getUserInbox().isEmpty()) {
-                    System.out.println(thisUser.getUserInbox().peek());
-                }*/
-
                 System.out.println("Type a valid command: ");
                 String command = scanner.nextLine();
-                // send the user's command to the server
+                // Send the user's command to the server
                 TCPPacketInteraction.sendPacket(clientSocket, command);
                 String responseMessage = (String) TCPPacketInteraction.receivePacket(clientSocket);
                 boolean isCommandValid = (boolean) TCPPacketInteraction.receivePacket(clientSocket);
                 System.out.println("Server response: " + responseMessage);
                 if (isCommandValid) {
-                    // this switch handles the user command from the client perspective
+                    // This switch handles the user command from the client perspective
                     switch (command) {
                         case "?placeItemForAuction":
+                            //noinspection LoopStatementThatDoesntLoop
                             while (true) {
                                 String message = "You're about to place an item in auction. Do you wish to proceed? " +
                                         "(YES/NO)";
@@ -81,11 +76,24 @@ public class Client {
                                     choice = scanner.nextLine();
                                 } while (!choice.equalsIgnoreCase("YES")
                                         && !choice.equalsIgnoreCase("NO"));
+                                //noinspection IfStatementWithIdenticalBranches
                                 if (choice.equalsIgnoreCase("YES")) {
-                                    System.out.println("Type item name: ");
-                                    String itemName = scanner.nextLine();
-                                    System.out.println("Type item description: ");
-                                    String itemDescription = scanner.nextLine();
+                                    String itemName;
+                                    do {
+                                        System.out.println("Type item name: ");
+                                        itemName = scanner.nextLine();
+                                        if (itemName.isEmpty()) {
+                                            System.out.println("Item name cannot be left empty.");
+                                        }
+                                    }while (itemName.isEmpty());
+                                    String itemDescription;
+                                    do {
+                                        System.out.println("Type item description: ");
+                                        itemDescription = scanner.nextLine();
+                                        if (itemDescription.isEmpty()) {
+                                            System.out.println("Item description cannot be left empty.");
+                                        }
+                                    }while (itemDescription.isEmpty());
                                     boolean isItemPriceValid;
                                     double itemPrice = 0;
                                     do {
@@ -112,6 +120,7 @@ public class Client {
                                     // variable may not be initialised (later on in the builder of the auction object).
                                     String closingType = "";
                                     boolean isClosingTypeValid = false;
+                                    //noinspection TextBlockMigration
                                     System.out.println("Select one of the ways of closing the auction.\n" +
                                             "TYPE1 : Run for specific amount of time. When time ends, the participant " +
                                             "with the highest bid will get the item.\nTYPE2 : The auction will continue " +
@@ -165,7 +174,7 @@ public class Client {
                                         }
                                     }while(!isTimerValid);
                                     scanner.nextLine();
-                                    // we firstly create the auction by calling the no args constructor in order to increment
+                                    // We firstly create the auction by calling the no args constructor in order to increment
                                     // the counter and set the auctionID.
                                     Auction auction = Auction.builder()
                                             .itemOnSale(Item.builder()
@@ -190,7 +199,7 @@ public class Client {
                                     break;
                                 }
                             }
-                            break;
+                        break;
                         case "?listActiveAuctions":
                             List<Auction> auctionList = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
                             boolean atLeastOneOpen = false;
@@ -212,7 +221,7 @@ public class Client {
                                         System.out.println(auction.getAuctionID() + ", " + auction.getItemOnSale().getItemName()
                                                 + ", " + auction.getItemOnSale().getItemDescription() + ", " +
                                                 auction.getItemOnSale().getItemStartingPrice() + ", " +
-                                                ClientAuctionManagementOperations.getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()).getBidValue()
+                                                AuctionRelatedFinder.getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()).getBidValue()
                                                 + ", " + auction.getOwner().getUsername());
                                     }
                                 }
@@ -220,20 +229,20 @@ public class Client {
                             } else {
                                 System.out.println("There are currently no auctions that are active.");
                             }
-                            break;
+                        break;
                         case "?participateInAuction":
                             List<Auction> auctionList0 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
-                            // we also receive the user object in order to make sure that the auction that the user
+                            // We also receive the user object in order to make sure that the auction that the user
                             // wants to participate is not one of his own (wouldn't make sense).
                             User thisUser0 = (User) TCPPacketInteraction.receivePacket(clientSocket);
-                            int auctionID0 = ClientAuctionManagementOperations.handleAuctionIdInput(scanner,
+                            int auctionID0 = ClientAuctionIdHandler.handleAuctionIdInput(scanner,
                                                  clientSocket,
                                                  auctionList0,
                                                  thisUser0,
                                                 "You cannot join an auction that " +
                                                         "was created by you.",
                                                 "participateInAuction");
-                            // if operation is abandoned by the user then inside the 'handleAuctionIdInput' method
+                            // If operation is abandoned by the user then inside the 'handleAuctionIdInput' method
                             // the server will be notified to abandon the operation. But for the client the loop will
                             // break, and it will return the default value of the 'auctionID' which is -1. So we check
                             // below that the operation will not be executed from the client-side.
@@ -241,16 +250,13 @@ public class Client {
                                 TCPPacketInteraction.sendPacket(clientSocket, auctionID0);
                                 System.out.println("You have now joined auction with ID: " + auctionID0 + ".");
                             }
-                            break;
+                        break;
                         case "?placeABid":
-                            // everytime we're changing variable names because they are already defined in the
+                            // Everytime we're changing variable names because they are already defined in the
                             // switch scope.
                             List<Auction> auctionList1 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
-                            //todo find why it doesn't receive the correct (updated list)
-                            // System.out.println(auctionList1);
-                            System.out.println(auctionList1);
                             User thisUser1 = (User) TCPPacketInteraction.receivePacket(clientSocket);
-                            int auctionID1 = ClientAuctionManagementOperations.handleAuctionIdInput(scanner,
+                            int auctionID1 = ClientAuctionIdHandler.handleAuctionIdInput(scanner,
                                                  clientSocket,
                                                  auctionList1,
                                                  thisUser1,
@@ -258,11 +264,11 @@ public class Client {
                                                 "placeABid");
                             if (auctionID1 != -1) {
                                 TCPPacketInteraction.sendPacket(clientSocket, auctionID1);
-                                Bid maxBid = ClientAuctionManagementOperations.getHighestBidPlacedInAuction(auctionList1, auctionID1);
-                                // we don't need to try-catch for NullPointerException at the line below, since at
+                                Bid maxBid = AuctionRelatedFinder.getHighestBidPlacedInAuction(auctionList1, auctionID1);
+                                // We don't need to try-catch for NullPointerException at the line below, since at
                                 // this point of the program the auctionID will certainly match an already existing
                                 // auction.
-                                double itemStartingPrice = ClientAuctionManagementOperations.getAuctionItemStartingPrice(auctionList1, auctionID1);
+                                double itemStartingPrice = AuctionRelatedFinder.getAuctionItemStartingPrice(auctionList1, auctionID1);
                                 boolean isOfferValid;
                                 String offerStr;
                                 double offer;
@@ -277,12 +283,12 @@ public class Client {
                                             System.out.println("Cancelled offer.");
                                             break;
                                         }
-                                        // if max bid is equal to -1 it means that there are no bids for that auction
+                                        // If max bid is equal to -1 it means that there are no bids for that auction
                                         // yet. So, we want the next message to be displayed.
                                         if (maxBid.getBidValue() != -1) {
                                             if (offer <= maxBid.getBidValue()) {
                                                 throw new BidInsufficientException("User with name: '" +
-                                                        ClientAuctionManagementOperations.getUserWhoPlacedBid(auctionList1, auctionID1, maxBid).getUsername() +
+                                                        AuctionRelatedFinder.getUserWhoPlacedBid(auctionList1, auctionID1, maxBid).getUsername() +
                                                         "' has placed the largest bid of value: '" + maxBid.getBidValue() +
                                                         "'\nOffer was not submitted.");
                                             }
@@ -313,14 +319,14 @@ public class Client {
                             List<Auction> auctionList2 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
                             // For The exception message argument/parameter, we do not really care what value it will have since we won't
                             // be needing this in this case/command.
-                            int auctionID2 = ClientAuctionManagementOperations.handleAuctionIdInput(scanner,
+                            int auctionID2 = ClientAuctionIdHandler.handleAuctionIdInput(scanner,
                                     clientSocket,
                                     auctionList2,
                                     null,
                                     "...",
                                     "checkHighestBid");
                             if (auctionID2 != -1) {
-                                Bid highestBid = ClientAuctionManagementOperations.getHighestBidPlacedInAuction(auctionList2, auctionID2);
+                                Bid highestBid = AuctionRelatedFinder.getHighestBidPlacedInAuction(auctionList2, auctionID2);
                                 if (highestBid.getBidValue() != -1) {
                                     System.out.println("The highest bid for the auction with id=" + auctionID2 + " is " +
                                             highestBid.getBidValue() + " and was placed at " + highestBid.getTimeBidPlaced());
@@ -337,7 +343,7 @@ public class Client {
                         case "?withdrawFromAuction":
                             List<Auction> auctionList3 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
                             User thisUser3 = (User) TCPPacketInteraction.receivePacket(clientSocket);
-                            int auctionID3 = ClientAuctionManagementOperations.handleAuctionIdInput(scanner,
+                            int auctionID3 = ClientAuctionIdHandler.handleAuctionIdInput(scanner,
                                     clientSocket,
                                     auctionList3,
                                     thisUser3,
@@ -345,8 +351,8 @@ public class Client {
                                     "withdrawFromAuction");
                             if (auctionID3 != -1) {
                                 if (!thisUser3.equals(
-                                        ClientAuctionManagementOperations.getUserWhoPlacedBid(auctionList3, auctionID3,
-                                                ClientAuctionManagementOperations.getHighestBidPlacedInAuction(auctionList3, auctionID3)))) {
+                                        AuctionRelatedFinder.getUserWhoPlacedBid(auctionList3, auctionID3,
+                                                AuctionRelatedFinder.getHighestBidPlacedInAuction(auctionList3, auctionID3)))) {
                                     System.out.println("You have successfully withdrawn from this auction!");
                                     TCPPacketInteraction.sendPacket(clientSocket, auctionID3);
                                 }
@@ -361,7 +367,7 @@ public class Client {
                         case "?disconnect":
                             List<Auction> auctionList4 = (List<Auction>) TCPPacketInteraction.receivePacket(clientSocket);
                             User thisUser4 = (User) TCPPacketInteraction.receivePacket(clientSocket);
-                            List<Auction> auctionsInWhichUserHighestBidder = ClientAuctionManagementOperations.checkIfHighestBidder(auctionList4, thisUser4);
+                            List<Auction> auctionsInWhichUserHighestBidder = AuctionRelatedFinder.checkIfHighestBidder(auctionList4, thisUser4);
                             if (!auctionsInWhichUserHighestBidder.isEmpty()) {
                                 // It was advised by the IDE to replace += with append of the string builder.
                                 StringBuilder auctionIDs = new StringBuilder("[");
@@ -389,12 +395,12 @@ public class Client {
                             TCPPacketInteraction.sendPacket(clientSocket, true);
                             User thisUser = (User) TCPPacketInteraction.receivePacket(clientSocket);
                             ExecutorService executorService = Executors.newSingleThreadExecutor();
-                            PrintInbox printInbox = new PrintInbox(thisUser);
-                            Future<Boolean> future = executorService.submit(printInbox);
+                            UserInboxPrinter userInboxPrinter = new UserInboxPrinter(thisUser);
+                            Future<Boolean> future = executorService.submit(userInboxPrinter);
                             while (!future.isDone()) {
                                 TCPPacketInteraction.sendPacket(clientSocket, true);
                                 User updatedUser = (User) TCPPacketInteraction.receivePacket(clientSocket);
-                                printInbox.setUser(updatedUser);
+                                userInboxPrinter.setUser(updatedUser);
                             }
                             executorService.shutdown();
                             TCPPacketInteraction.sendPacket(clientSocket, false);

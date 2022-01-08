@@ -2,102 +2,54 @@ package org.company.service;
 
 import org.company.exceptions.*;
 import org.company.model.*;
-
 import java.io.IOException;
 import java.net.Socket;
 import java.util.*;
 
-public class ClientAuctionManagementOperations {
+/** Two important methods that are required for the process of getting an auction ID as input from the user. The
+ *  method "isUserInParticipants" may not entirely match the context of the class but its only usage is within this
+ *  class (called once by the method "handleAuctionIdInput"). That is the reason why it was decided to be placed here.
+ *  @author Theofanis Gkoufas
+ */
 
-    public static List<Auction> checkIfHighestBidder(List<Auction> auctionList, User thisUser) {
-        List<Auction> auctionsInWhichUserHighestBidder = new ArrayList<>();
-        for (Auction auction:
-                auctionList) {
-            if (auction.getParticipants().contains(thisUser)) {
-                if (getUserWhoPlacedBid(auctionList,
-                        auction.getAuctionID(),
-                        getHighestBidPlacedInAuction(auctionList, auction.getAuctionID()))
-                        .equals(thisUser) && auction.getAuctionStatus().equals(AuctionStatus.OPEN))
-                {
-                    auctionsInWhichUserHighestBidder.add(auction);
-                }
-            }
-        }
-        return auctionsInWhichUserHighestBidder;
-    }
+public class ClientAuctionIdHandler {
 
-    public static double getAuctionItemStartingPrice(List<Auction> auctionList, int auctionID) throws NullPointerException {
-        Auction thisAuction = null;
-        for (Auction auction:
-                auctionList) {
-            if (auction.getAuctionID() == auctionID) {
-                thisAuction = auction;
-            }
-        }
-        return thisAuction.getItemOnSale().getItemStartingPrice();
-    }
-
-    public static Bid getHighestBidPlacedInAuction(List<Auction> auctionList, int auctionID) {
-        HashMap<User, Bid> bidsPlaced = null;
-        // The method will return the bid with a value of -1 in the case that there are
-        // no bids placed.
-        // The bidsPlaced which is initiated as null could produce a (Null) Exception but in
-        // the way that it is being used in this program, there is no way that this
-        // could happen, since we have already checked that the auctionID exists.
-        Bid maxBid = Bid.builder()
-                .bidValue(-1.0)
-                .build();
-        for (Auction auction:
-                auctionList) {
-            if (auction.getAuctionID() == auctionID) {
-                bidsPlaced = auction.getBidsPlaced();
-            }
-        }
-        if (bidsPlaced != null) {
-            if (bidsPlaced.isEmpty()) {
-                return maxBid;
-            } else {
-                for (Bid bid:
-                        bidsPlaced.values()) {
-                    if (maxBid.getBidValue() < bid.getBidValue()) {
-                        maxBid = bid;
-                    }
-                }
-            }
-        }
-        return maxBid;
-    }
-
-    public static User getUserWhoPlacedBid(List<Auction> auctionList, int auctionID, Bid bid) {
-        // Retrieve key (user) based on value (bid).
-        // Got inspiration from -> https://www.baeldung.com/java-map-key-from-value
-        HashMap<User, Bid> bidsPlaced = null;
-        for (Auction auction:
-                auctionList) {
-            if (auction.getAuctionID() == auctionID) {
-                bidsPlaced = auction.getBidsPlaced();
-            }
-        }
-        User userWhoPlacedThatBid = null;
-        for (Map.Entry<User, Bid> entry:
-                bidsPlaced.entrySet()) {
-            if (entry.getValue().equals(bid)) {
-                userWhoPlacedThatBid = entry.getKey();
-            }
-        }
-        return userWhoPlacedThatBid;
-    }
-
+    /** The main method that is being used in various commands performed by the user, in order to get an auction ID.
+     * @param scanner A reference to a Scanner object that is created inside the Client Class.
+     * @param clientSocket The socket that has information about the server that the client wants to connect to.
+     * @param auctionList The list that stores all the auctions that are currently on the system.
+     * @param thisUser A reference to the User object, meaning the user that is currently communicating with the server.
+     *                 All the user objects are being retrieved from the server where they are being created/stored.
+     * @param exceptionMessage This method is being used in various cases for example in commands that can be performed
+     *                         by the user like "participateInAuction", "placeABid" etc. One thing those operations have
+     *                         in common is the need for checking whether the auction for which the user wants to perform
+     *                         an operation is created by him/her. For example, if the user wants to bid on an auction that
+     *                         was created by him, then a message will be displayed indicating that it is not possible.
+     *                         In the case that the user wants to withdraw from an auction that was created by him, a
+     *                         corresponding message should be displayed indicating that once again, it is not possible
+     *                         to do. In conclusion, it is the same check that is happening, with a different message
+     *                         that fits the case.
+     * @param operationName This method is used for various commands that can be performed by the user. For the
+     *                      differentiation of the commands it is required to have a parameter.
+     * @return An auction ID that was inserted by the user (after validating it).
+     * @throws IOException In order to send a packet to the auction system server (or wherever the socket is pointing to),
+     *                     it is required to catch the case where an IOException could occur.
+     */
     public static int handleAuctionIdInput(Scanner scanner,
-                                            Socket clientSocket,
-                                            List<Auction> auctionList,
-                                            User thisUser,
-                                            String exceptionMessage,
-                                            String operationName) throws IOException {
+                                           Socket clientSocket,
+                                           List<Auction> auctionList,
+                                           User thisUser,
+                                           String exceptionMessage,
+                                           String operationName) throws IOException {
         String auctionIDStr;
         int auctionID = -1;
         boolean isAuctionIDValid;
         do {
+            /*
+                The comment below that was generated by the IDE helps in stopping the inspection when it comes to proposing
+                that the if, if-else statements can be replaced by a switch. We don't want this warning to show up.
+            */
+            //noinspection IfCanBeSwitch
             if (operationName.equals("participateInAuction")) {
                 System.out.println("Type the ID of the auction that you wish to participate or -1" +
                         " to abandon operation:");
@@ -129,9 +81,11 @@ public class ClientAuctionManagementOperations {
                             if (auction.getAuctionStatus().equals(AuctionStatus.CLOSED)) {
                                 isAuctionClosed = true;
                             }
-                            // we write the below statement because in the case of command "checkHighestBid" etc.
-                            // we do not pass a user because it is not needed. That way we ensure that we won't get
-                            // an exception (thisUser being null).
+                            /*
+                                We write the below statement because in the case of command "checkHighestBid" etc.
+                                we do not pass a user because it is not needed. That way, we ensure that we won't get
+                                an exception (thisUser being null).
+                            */
                             if (thisUser != null) {
                                 if (auction.getOwner().getUsername().equals(thisUser.getUsername())) {
                                     isOwnedByUser = true;
@@ -149,7 +103,7 @@ public class ClientAuctionManagementOperations {
                 }
                 if (isOperationAbandoned) {
                     System.out.println("Operation abandoned!");
-                    // we let the server know that the operation has been abandoned.
+                    // We let the server know that the operation has been abandoned.
                     TCPPacketInteraction.sendPacket(clientSocket, -1);
                     break;
                 }
@@ -182,9 +136,11 @@ public class ClientAuctionManagementOperations {
                                 "you are not a participant. You need to join first.");
                     }
                 }
-                // if execution reaches this point, then it means that nothing went bad (no exceptions or operation
-                // abandoned) and that 'isAuctionIDValid' has a value of true. So the condition of the loop is false
-                // and the main operation will be fulfilled.
+                /*
+                    If execution reaches this point, then it means that nothing went bad (no exceptions or operation
+                    abandoned) and that 'isAuctionIDValid' has a value of true. So the condition of the loop is false
+                    and the main operation will be fulfilled.
+                */
                 isAuctionIDValid = true;
             } catch (NumberFormatException e) {
                 System.out.println("Auction ID must consist of a numeric value.");
@@ -198,6 +154,14 @@ public class ClientAuctionManagementOperations {
         return auctionID;
     }
 
+    /** Given an auction ID that (should) match to an auction within the auction system and a user, it retrieves whether
+     *  the given user is a participant of that auction or not. The method is being called at a state (ln97) where the auction
+     *  id is already being checked that belongs to an auction within the auctions of the system (ln79).
+     * @param auctionList The list that stores all the auctions that are currently on the system.
+     * @param thisUser A reference to the User object, meaning the user that is currently communicating with the server.
+     * @param auctionID The unique id that matches to an auction.
+     * @return True or false; whether the user is a participant or not respectively.
+     */
     public static boolean isUserInParticipants(List<Auction> auctionList, User thisUser, int auctionID) {
         boolean isUserInParticipants = false;
         for (Auction auction:
