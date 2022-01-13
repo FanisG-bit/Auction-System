@@ -4,6 +4,7 @@ import lombok.*;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 /** Represents an Auction.
  *  @author Theofanis Gkoufas
@@ -47,5 +48,18 @@ public class Auction implements Serializable {
 
     // TODO we have the secondScenarioTimers map that uses Auction as the key. We should probably override
     //  equals and hashCode;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Auction auction = (Auction) o;
+        return auctionID == auction.auctionID;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(auctionID);
+    }
 
 }
