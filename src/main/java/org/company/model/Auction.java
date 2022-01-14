@@ -46,9 +46,6 @@ public class Auction implements Serializable {
         counter++;
     }
 
-    // TODO we have the secondScenarioTimers map that uses Auction as the key. We should probably override
-    //  equals and hashCode;
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

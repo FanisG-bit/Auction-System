@@ -94,7 +94,7 @@ public class AuctionRelatedFinder {
         return maxBid;
     }
 
-    /** Given an auction ID and a Bid, it retrieves the user who placed that bid in the auction that has the that ID.
+    /** Given an auction ID and a Bid, it retrieves the user who placed that bid in the auction that has that ID.
      * @param auctionList The list that stores all the auctions that are currently on the system.
      * @param auctionID The id of the auction in which we want to find the user who placed a specific bid.
      * @param bid The bid that is placed by a user.

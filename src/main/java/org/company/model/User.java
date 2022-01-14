@@ -20,7 +20,7 @@ public class User implements Serializable {
      *  It is automatically assigned to the user upon successful connection to the auction system.
      */
     private String username;
-    /** User's IP address be used originally for the differentiation of the users but was changed due
+    /** User's IP address was used originally for the differentiation of the users but was changed due
      *  to lack of hardware resources (meaning that this program was developed in one computer and there
      *  was no way of testing it). It is still stored as an attribute but not used throughout the execution.
      */
